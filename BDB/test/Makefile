@@ -1,6 +1,6 @@
 
 
-LIBS+= -lrt -llua
+LIBS+= -lrt -lpthread
 CXXFLAGS += -I /usr/local/BerkeleyDB.6.0/include
 CXXFLAGS += -I ../
 
