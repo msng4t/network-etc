@@ -1,0 +1,413 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include "RBTree.h"
+MINA_NAMESPACE_START
+
+static inline void RBTreeLeftRotate(CRBTreeNode** appoRoot,
+        CRBTreeNode* apoSentinel, CRBTreeNode* apoNode);
+static inline void RBTreeRightRotate(CRBTreeNode** appoRoot,
+        CRBTreeNode* apoSentinel, CRBTreeNode* apoNode);
+
+void RBTreeInsert(volatile CRBTree* apoTree, CRBTreeNode* apoNode)
+{
+    CRBTreeNode*  lpoTemp;
+    CRBTreeNode** lppoRoot = (CRBTreeNode **)&apoTree->mpoRoot;
+    CRBTreeNode*  lpoSentinel = apoTree->mpoSentinel;
+
+
+//    MinaPreTrival(apoTree->mpoRoot, lpoSentinel);
+//    MinaMidTrival(apoTree->mpoRoot, lpoSentinel);
+    if (*lppoRoot == lpoSentinel)
+    {
+        apoNode->mpoParent = NULL;
+        apoNode->mpoLeft = lpoSentinel;
+        apoNode->mpoRight = lpoSentinel;
+        RBT_BLACK(apoNode);
+
+        *lppoRoot = apoNode;
+        return;
+    }
+
+//    MinaPreTrival(apoTree->mpoRoot, lpoSentinel);
+//    MinaMidTrival(apoTree->mpoRoot, lpoSentinel);
+    assert(*lppoRoot != NULL);
+    apoTree->Insert(*lppoRoot, apoNode, lpoSentinel);
+//    MinaPreTrival(apoTree->mpoRoot, lpoSentinel);
+//    MinaMidTrival(apoTree->mpoRoot, lpoSentinel);
+
+    while (apoNode != *lppoRoot && RBT_IS_RED(apoNode->mpoParent))
+    {
+        if (apoNode->mpoParent == apoNode->mpoParent->mpoParent->mpoLeft)
+        {
+            lpoTemp = apoNode->mpoParent->mpoParent->mpoRight;
+
+            if (RBT_IS_RED(lpoTemp))
+            {
+                RBT_BLACK(apoNode->mpoParent);
+                RBT_BLACK(lpoTemp);
+                RBT_RED(apoNode->mpoParent->mpoParent);
+                apoNode = apoNode->mpoParent->mpoParent;
+            }
+            else
+            {
+                if (apoNode == apoNode->mpoParent->mpoRight)
+                {
+                    apoNode = apoNode->mpoParent;
+                    RBTreeLeftRotate(lppoRoot, lpoSentinel, apoNode);
+                }
+
+                RBT_BLACK(apoNode->mpoParent);
+                RBT_RED(apoNode->mpoParent->mpoParent);
+                RBTreeRightRotate(lppoRoot, lpoSentinel, apoNode->mpoParent->mpoParent);
+            }
+        }
+        else
+        {
+            lpoTemp = apoNode->mpoParent->mpoParent->mpoLeft;
+
+            if (RBT_IS_RED(lpoTemp))
+            {
+                RBT_BLACK(apoNode->mpoParent);
+                RBT_BLACK(lpoTemp);
+                RBT_RED(apoNode->mpoParent->mpoParent);
+                apoNode = apoNode->mpoParent->mpoParent;
+            }
+            else
+            {
+                if (apoNode == apoNode->mpoParent->mpoLeft)
+                {
+                    apoNode = apoNode->mpoParent;
+                    RBTreeRightRotate(lppoRoot, lpoSentinel, apoNode);
+                }
+
+                RBT_BLACK(apoNode->mpoParent);
+                RBT_RED(apoNode->mpoParent->mpoParent);
+                RBTreeLeftRotate(lppoRoot, lpoSentinel, apoNode->mpoParent->mpoParent);
+            }
+        }
+    }
+
+    RBT_BLACK(*lppoRoot);
+//    MinaPreTrival(apoTree->mpoRoot, lpoSentinel);
+//    MinaMidTrival(apoTree->mpoRoot, lpoSentinel);
+
+}
+
+void RBTreeDelete(volatile CRBTree* apoTree, CRBTreeNode* apoNode)
+{
+    CRBTreeNode** lppoRoot;
+    CRBTreeNode* lpoSentinel;
+    CRBTreeNode* subst;
+    CRBTreeNode* lpoTemp;
+    CRBTreeNode* tempw;
+    UKey red;
+
+    lppoRoot = (CRBTreeNode**)&apoTree->mpoRoot;
+    lpoSentinel = apoTree->mpoSentinel;
+
+//    MinaPreTrival(*lppoRoot, lpoSentinel);
+//    MinaMidTrival(*lppoRoot, lpoSentinel);
+
+    if (apoNode->mpoLeft == NULL || apoNode->mpoRight == NULL)
+    {
+        return;
+    }
+
+    if (apoNode->mpoLeft == lpoSentinel)
+    {
+        lpoTemp = apoNode->mpoRight;
+        subst = apoNode;
+    }
+    else if (apoNode->mpoRight == lpoSentinel)
+    {
+        lpoTemp = apoNode->mpoLeft;
+        subst = apoNode;
+    }
+    else
+    {
+        subst = RBTreeMin(apoNode->mpoRight, lpoSentinel);
+
+        if (subst->mpoLeft != lpoSentinel)/*never reach */
+        {
+            lpoTemp = subst->mpoLeft;
+        }
+        else
+        {
+            lpoTemp = subst->mpoRight;
+        }
+    }
+
+    if (subst == *lppoRoot)
+    {
+        *lppoRoot = lpoTemp;
+        RBT_BLACK(lpoTemp);
+        apoNode->mpoLeft = NULL;
+        apoNode->mpoRight = NULL;
+        apoNode->mpoParent = NULL;
+        return;
+    }
+
+    red = RBT_IS_RED(subst);
+
+    if (subst == subst->mpoParent->mpoLeft)
+    {
+        subst->mpoParent->mpoLeft = lpoTemp;
+    }
+    else
+    {
+        subst->mpoParent->mpoRight = lpoTemp;
+    }
+
+    if (subst == apoNode)
+    {
+        lpoTemp->mpoParent = subst->mpoParent;
+    }
+    else
+    {
+        if (subst->mpoParent == apoNode)
+        {
+            lpoTemp->mpoParent = subst;
+        }
+        else
+        {
+            lpoTemp->mpoParent = subst->mpoParent;
+        }
+
+        subst->mpoLeft = apoNode->mpoLeft;
+        subst->mpoRight = apoNode->mpoRight;
+        subst->mpoParent = apoNode->mpoParent;
+        RBT_COPY_COLOR(subst, apoNode);
+
+        if (apoNode == *lppoRoot)
+        {
+            *lppoRoot = subst;
+        }
+        else
+        {
+            if (apoNode == apoNode->mpoParent->mpoLeft)
+            {
+                apoNode->mpoParent->mpoLeft = subst;
+            }
+            else
+            {
+                apoNode->mpoParent->mpoRight = subst;
+            }
+        }
+
+        if (subst->mpoLeft != lpoSentinel)
+        {
+            subst->mpoLeft->mpoParent = subst;
+        }
+
+        if (subst->mpoRight != lpoSentinel)
+        {
+            subst->mpoRight->mpoParent = subst;
+        }
+    }
+
+    apoNode->mpoLeft = NULL;
+    apoNode->mpoRight = NULL;
+    apoNode->mpoParent = NULL;
+
+    if (red)
+    {
+        return;
+    }
+
+    while (lpoTemp != *lppoRoot && RBT_IS_BLACK(lpoTemp))
+    {
+        if (lpoTemp == lpoTemp->mpoParent->mpoLeft)
+        {
+            tempw = lpoTemp->mpoParent->mpoRight;
+            if (RBT_IS_RED(tempw))
+            {
+                RBT_BLACK(tempw);
+                RBT_RED(lpoTemp->mpoParent);
+                RBTreeLeftRotate(lppoRoot, lpoSentinel, lpoTemp->mpoParent);
+                tempw= lpoTemp->mpoParent->mpoRight;
+            }
+
+            if (RBT_IS_BLACK(tempw->mpoLeft) && RBT_IS_BLACK(tempw->mpoRight))
+            {
+                RBT_RED(tempw);
+                lpoTemp = lpoTemp->mpoParent;
+            }
+            else
+            {
+                if (RBT_IS_BLACK(tempw->mpoRight))
+                {
+                    RBT_BLACK(tempw->mpoLeft);
+                    RBT_RED(tempw);
+                    RBTreeRightRotate(lppoRoot, lpoSentinel, tempw);
+                    tempw = lpoTemp->mpoParent->mpoRight;
+                }
+
+                RBT_COPY_COLOR(tempw, lpoTemp->mpoParent);
+                RBT_BLACK(lpoTemp->mpoParent);
+                RBT_BLACK(tempw->mpoRight);
+                RBTreeLeftRotate(lppoRoot, lpoSentinel, lpoTemp->mpoParent);
+                lpoTemp = *lppoRoot;
+            }
+        }
+        else
+        {
+            tempw = lpoTemp->mpoParent->mpoLeft;
+
+            if (RBT_IS_RED(tempw))
+            {
+                RBT_BLACK(tempw);
+                RBT_RED(lpoTemp->mpoParent);
+                RBTreeRightRotate(lppoRoot, lpoSentinel, lpoTemp->mpoParent);
+                tempw = lpoTemp->mpoParent->mpoLeft;
+            }
+
+            if (RBT_IS_BLACK(tempw->mpoLeft) && RBT_IS_BLACK(tempw->mpoRight))
+            {
+                RBT_RED(tempw);
+                lpoTemp = lpoTemp->mpoParent;
+            }
+            else
+            {
+                if (RBT_IS_BLACK(tempw->mpoLeft))
+                {
+                    RBT_BLACK(tempw->mpoRight);
+                    RBT_RED(tempw);
+                    RBTreeLeftRotate(lppoRoot, lpoSentinel, tempw);
+                    tempw = lpoTemp->mpoParent->mpoLeft;
+                }
+
+                RBT_COPY_COLOR(tempw, lpoTemp->mpoParent);
+                RBT_BLACK(lpoTemp->mpoParent);
+                RBT_BLACK(tempw->mpoLeft);
+                RBTreeRightRotate(lppoRoot, lpoSentinel, lpoTemp->mpoParent);
+                lpoTemp = *lppoRoot;
+            }
+        }
+
+    }
+
+    RBT_BLACK(lpoTemp);
+}
+
+
+
+
+
+void RBTreeInsertValue(CRBTreeNode* apoTemp, CRBTreeNode* apoNode, CRBTreeNode* apoSentinel)
+{
+    CRBTreeNode** nodep;
+
+    for(;;)
+    {
+        nodep = ((IKey)(apoNode->muKey - apoTemp->muKey) < 0)
+            ? &apoTemp->mpoLeft : &apoTemp->mpoRight;
+
+        if (*nodep == apoSentinel)
+        {
+            break;
+        }
+        apoTemp = *nodep;
+    }
+
+    *nodep = apoNode;
+    apoNode->mpoParent = apoTemp;
+    apoNode->mpoLeft = apoSentinel;
+    apoNode->mpoRight = apoSentinel;
+    RBT_RED(apoNode);
+
+}
+
+
+static inline void RBTreeLeftRotate(CRBTreeNode** appoRoot,
+        CRBTreeNode* apoSentinel, CRBTreeNode* apoNode)
+{
+    CRBTreeNode* lpoTemp;
+
+    lpoTemp = apoNode->mpoRight;
+    apoNode->mpoRight = lpoTemp->mpoLeft;
+    //MinaPreTrival(*appoRoot, apoSentinel);
+    //MinaMidTrival(*appoRoot, apoSentinel);
+
+    if(lpoTemp->mpoLeft != apoSentinel)
+    {
+        lpoTemp->mpoLeft->mpoParent = apoNode;
+    }
+
+    lpoTemp->mpoParent = apoNode->mpoParent;
+
+    if (apoNode == *appoRoot)
+    {
+        *appoRoot = lpoTemp;
+    }
+    else if (apoNode == apoNode->mpoParent->mpoLeft)
+    {
+        apoNode->mpoParent->mpoLeft = lpoTemp;
+    }
+    else
+    {
+        apoNode->mpoParent->mpoRight = lpoTemp;
+    }
+
+    lpoTemp->mpoLeft = apoNode;
+    apoNode->mpoParent = lpoTemp;
+    //MinaPreTrival(*appoRoot, apoSentinel);
+    //MinaMidTrival(*appoRoot, apoSentinel);
+}
+
+static inline void RBTreeRightRotate(CRBTreeNode** appoRoot,
+        CRBTreeNode* apoSentinel, CRBTreeNode* apoNode)
+{
+    CRBTreeNode* lpoTemp;
+
+    lpoTemp = apoNode->mpoLeft;
+    apoNode->mpoLeft = lpoTemp->mpoRight;
+    //MinaPreTrival(*appoRoot, spSentinel);
+    //MinaMidTrival(*appoRoot, spSentinel);
+
+    if (lpoTemp->mpoRight != apoSentinel)
+    {
+        lpoTemp->mpoRight->mpoParent = apoNode;
+    }
+
+    lpoTemp->mpoParent = apoNode->mpoParent;
+
+    if (apoNode == *appoRoot)
+    {
+        *appoRoot = lpoTemp;
+    }
+    else if (apoNode == apoNode->mpoParent->mpoRight)
+    {
+        apoNode->mpoParent->mpoRight = lpoTemp;
+    }
+    else
+    {
+        apoNode->mpoParent->mpoLeft = lpoTemp;
+    }
+
+    lpoTemp->mpoRight = apoNode;
+    apoNode->mpoParent = lpoTemp;
+    //MinaPreTrival(*appoRoot, apoSentinel);
+    //MinaMidTrival(*appoRoot, apoSentinel);
+}
+
+void MinaPreTrival(CRBTreeNode* apoNode, CRBTreeNode* apoSentinel)
+{
+    if (apoNode == apoSentinel) return;
+    //printf("v: %lld %s a: %x\t\t l: %p-r: %p -p:%p\n", apoNode->muKey, RBT_IS_RED(apoNode) ? "r": "b", apoNode, apoNode->mpoLeft, apoNode->mpoRight, apoNode->mpoParent);
+    if (apoNode->mpoLeft != apoSentinel)
+        MinaPreTrival(apoNode->mpoLeft, apoSentinel);
+    if (apoNode->mpoRight != apoSentinel)
+        MinaPreTrival(apoNode->mpoRight, apoSentinel);
+}
+
+void MinaMidTrival(CRBTreeNode* apoNode, CRBTreeNode* apoSentinel)
+{
+    if (apoNode == apoSentinel) return;
+    if (apoNode->mpoLeft != apoSentinel)
+        MinaMidTrival(apoNode->mpoLeft, apoSentinel);
+    //printf("v: %lld %s a: %x\t\t l: %p-r: %p -p:%p\n", apoNode->muKey, RBT_IS_RED(apoNode) ? "r": "b", apoNode, apoNode->mpoLeft, apoNode->mpoRight, apoNode->mpoParent);
+    if (apoNode->mpoRight != apoSentinel)
+        MinaMidTrival(apoNode->mpoRight, apoSentinel);
+}
+MINA_NAMESPACE_END
